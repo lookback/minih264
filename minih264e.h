@@ -5600,7 +5600,7 @@ static int quantize_neon(quant_t *q, int mode, const uint16_t *qdat, int zmask)
 
                 {
 // vtbl4_u8 is marked unavailable for iOS arm64, use wider versions there.
-#if defined(__APPLE__) && defined(__aarch64__) &&  defined(__apple_build_version__)
+#if defined(__APPLE__) && defined(__aarch64__) &&  defined(__apple_build_version__) && (__apple_build_version__< 6020037)
                 uint8x16x2_t vlut;
                 vlut.val[0] = vreinterpretq_u8_s16(vcombine_s16(d22, d23));
                 vlut.val[1] = vreinterpretq_u8_s16(vcombine_s16(d24, d25));
