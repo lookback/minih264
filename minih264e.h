@@ -5199,8 +5199,8 @@ static void h264e_copy_8x8_neon(pix_t *d, int d_stride, const pix_t *s)
 
 static void h264e_copy_16x16_neon(pix_t *d, int d_stride, const pix_t *s, int s_stride)
 {
-    assert(!((unsigned)d & 7));
-    assert(!((unsigned)s & 7));
+    assert(!((uintptr_t)d & 7));
+    assert(!((uintptr_t)s & 7));
     vst1q_u8(d, vld1q_u8(s)); s += s_stride; d += d_stride;
     vst1q_u8(d, vld1q_u8(s)); s += s_stride; d += d_stride;
     vst1q_u8(d, vld1q_u8(s)); s += s_stride; d += d_stride;
@@ -5692,8 +5692,8 @@ static void h264e_transform_add_neon(pix_t *out, int out_stride, const pix_t *pr
     int crow = side;
     int ccol = crow;
 
-    assert(!((unsigned)out % 4));
-    assert(!((unsigned)pred % 4));
+    assert(!((uintptr_t)out % 4));
+    assert(!((uintptr_t)pred % 4));
     assert(!(out_stride % 4));
     do
     {
