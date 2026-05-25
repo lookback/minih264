@@ -5463,9 +5463,10 @@ static void TransformResidual4x4_neon(const int16_t *pSrc, const pix_t *pred, pi
 static int is_zero_neon(const int16_t *dat, int i0, const uint16_t *thr)
 {
     static const uint16x8_t g_ign_first = { 0, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff };
-    int16x8_t v0 = vabsq_s16(*(int16x8_t *)dat);
-    int16x8_t v1 = vabsq_s16(*(int16x8_t *)(dat + 8));
-    int16x8_t t = *(int16x8_t *)thr;
+    // qdat threshold vectors are not guaranteed to be 16-byte aligned on ARMv7.
+    int16x8_t v0 = vabsq_s16(vld1q_s16(dat));
+    int16x8_t v1 = vabsq_s16(vld1q_s16(dat + 8));
+    int16x8_t t = vreinterpretq_s16_u16(vld1q_u16(thr));
     uint16x8_t m0 = vcgtq_s16(v0, t);
     uint16x8_t m1 = vcgtq_s16(v1, t);
     if (i0)
