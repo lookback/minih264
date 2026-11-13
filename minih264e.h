@@ -5158,22 +5158,15 @@ static int h264e_sad_mb_unlaign_wh_neon(const pix_t *a, int a_stride, const pix_
     {
         do
         {
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabdl_u8(    vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
-            va = vld1q_u8(a), vb = vld1q_u8(b);  a += a_stride, b += 16;
-            s0 = vabal_u8(s0, vget_low_u8(va), vget_low_u8(vb));
+            // Eight-pixel blocks need eight-byte loads, including on the
+            // final row where a full vector would leave the input plane.
+            s0 = vdupq_n_u16(0);
+            for (int row = 0; row < 8; row++)
+            {
+                s0 = vabal_u8(s0, vld1_u8(a), vld1_u8(b));
+                a += a_stride;
+                b += 16;
+            }
 
             uint32x4_t v0 = vpaddlq_u16(s0);
             uint64x2_t v1 = vpaddlq_u32(v0);
@@ -5360,8 +5353,15 @@ static void FwdTransformResidual4x42_neon(const uint8_t *inp, const uint8_t *pre
     }
 #else
     /* Transform rows */
-    uint8x8_t inp0  = vreinterpret_u8_s32(vtrn_s32(vreinterpret_s32_u8(vld1_u8(inp)),  vreinterpret_s32_u8(vld1_u8(inp + inp_stride))).val[0]);
-    uint8x8_t inp1  = vreinterpret_u8_s32(vtrn_s32(vreinterpret_s32_u8(vld1_u8(inp + 2*inp_stride)), vreinterpret_s32_u8(vld1_u8(inp + 3*inp_stride))).val[0]);
+    // Only four input pixels are needed from each row. An eight-byte load
+    // can cross the end of a tightly packed plane on its final block.
+    uint32_t row0, row1, row2, row3;
+    memcpy(&row0, inp, sizeof(row0));
+    memcpy(&row1, inp + inp_stride, sizeof(row1));
+    memcpy(&row2, inp + 2*inp_stride, sizeof(row2));
+    memcpy(&row3, inp + 3*inp_stride, sizeof(row3));
+    uint8x8_t inp0 = vreinterpret_u8_u32(vset_lane_u32(row1, vdup_n_u32(row0), 1));
+    uint8x8_t inp1 = vreinterpret_u8_u32(vset_lane_u32(row3, vdup_n_u32(row2), 1));
     uint8x8_t pred0 = vreinterpret_u8_s32(vtrn_s32(vreinterpret_s32_u8(vld1_u8(pred)),  vreinterpret_s32_u8(vld1_u8(pred + 16))).val[0]);
     uint8x8_t pred1 = vreinterpret_u8_s32(vtrn_s32(vreinterpret_s32_u8(vld1_u8(pred + 2*16)), vreinterpret_s32_u8(vld1_u8(pred + 3*16))).val[0]);
     int16x8_t q0 = vreinterpretq_s16_u16(vsubl_u8(inp0, pred0));
@@ -10507,8 +10507,11 @@ static void mb_deblock(deblock_filter_t *df, int mb_type, int qp_this, int mbx, 
         h264e_deblock_luma(mbyuv->yuv[0], mbyuv->stride[0], &par);
 
         qp_this = qpy2qpc[qp_this + DQP_CHROMA];
-        qp_left = qpy2qpc[qp_left + DQP_CHROMA];
-        qp_top = qpy2qpc[qp_top + DQP_CHROMA];
+        // Boundary neighbors have no QP. Only map a neighbor when its
+        // edge participates in filtering; the absent-neighbor sentinel
+        // is outside qpy2qpc's 0..51 range.
+        if (strength32[0]) qp_left = qpy2qpc[qp_left + DQP_CHROMA];
+        if (strength32[4]) qp_top = qpy2qpc[qp_top + DQP_CHROMA];
         cr++;
     }
 }
